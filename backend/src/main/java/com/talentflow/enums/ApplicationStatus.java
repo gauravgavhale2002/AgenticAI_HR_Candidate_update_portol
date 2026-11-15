@@ -1,0 +1,18 @@
+package com.talentflow.enums;
+
+public enum ApplicationStatus {
+    REGISTERED,
+    PROFILE_COMPLETED,
+    APPLIED,
+    AI_ANALYSIS_PENDING,
+    AI_ANALYSIS_COMPLETED,
+    HR_REVIEW_PENDING,
+    SHORTLISTED,
+    SCREENING,
+    INTERVIEW_SCHEDULED,
+    INTERVIEW_IN_PROGRESS,
+    SELECTED,
+    REJECTED,
+    ON_HOLD,
+    WITHDRAWN
+}
