@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowLeft, BriefcaseBusiness, CheckCircle2, RefreshCw, ShieldCheck, Sparkles, Users } from 'lucide-react'
+import { ArrowLeft, BriefcaseBusiness, CheckCircle2, RefreshCw, ShieldCheck, Sparkles, Trash2, Users } from 'lucide-react'
 import { getCountries, getCountryCallingCode, isValidPhoneNumber, parsePhoneNumber } from 'libphonenumber-js/max'
 
 type RegisteredCandidate = {
@@ -346,7 +346,9 @@ export default function App() {
   }
 
   async function deleteCandidate(candidate: RegisteredCandidate) {
-    if (!window.confirm(`Permanently delete ${candidate.firstName} ${candidate.lastName} and their application data and resume?`)) {
+    if (!window.confirm(
+      `Are you sure you want to permanently delete ${candidate.firstName} ${candidate.lastName}? Their profile, application data, and resume will be deleted. Their phone number will also be blocked from registering again on this demo server. Only continue if this account is being removed for abusive language or misuse. This demo's block list may be cleared if the server restarts.`,
+    )) {
       return
     }
 
@@ -801,8 +803,8 @@ export default function App() {
                         <th className="px-6 py-3 font-medium">Email</th>
                         <th className="px-6 py-3 font-medium">Skills</th>
                         <th className="px-6 py-3 font-medium">Hiring stage</th>
-                        <th className="px-6 py-3 font-medium">Actions</th>
                         <th className="px-6 py-3 font-medium">Registered</th>
+                        <th className="px-6 py-3 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
@@ -818,20 +820,22 @@ export default function App() {
                                   : 'bg-emerald-500/15 text-emerald-300'
                             }`}>{getStageLabel(candidate.hiringStatus)}</span>
                           </td>
+                          <td className="px-6 py-4">{new Date(candidate.registeredAt).toLocaleString()}</td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-4">
                               <button type="button" onClick={() => { setSelectedCandidate(candidate); setHrNotes(''); setManagerFeedback(candidate.managerFeedback ?? '') }} className="text-indigo-300 hover:text-indigo-200">Review profile</button>
                               <button
                                 type="button"
+                                aria-label={`Delete ${candidate.firstName} ${candidate.lastName}`}
                                 disabled={deletingCandidateId !== null}
                                 onClick={() => void deleteCandidate(candidate)}
-                                className="text-rose-300 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/20 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-50"
                               >
+                                <Trash2 className="h-3.5 w-3.5" />
                                 {deletingCandidateId === candidate.id ? 'Deleting…' : 'Delete'}
                               </button>
                             </div>
                           </td>
-                          <td className="px-6 py-4">{new Date(candidate.registeredAt).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>

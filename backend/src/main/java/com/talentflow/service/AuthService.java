@@ -9,6 +9,7 @@ import com.talentflow.dto.CandidatePortalLoginRequest;
 import com.talentflow.dto.CandidatePortalProfileResponse;
 import com.talentflow.dto.CandidatePortalResponse;
 import com.talentflow.dto.CandidateStatusHistoryResponse;
+import com.talentflow.entity.BlockedPhoneNumber;
 import com.talentflow.entity.Candidate;
 import com.talentflow.entity.CandidateSkill;
 import com.talentflow.entity.CandidateStatusHistory;
@@ -19,6 +20,7 @@ import com.talentflow.enums.CandidateHiringStatus;
 import com.talentflow.enums.RoleName;
 import com.talentflow.repository.CandidateRepository;
 import com.talentflow.repository.CandidateStatusHistoryRepository;
+import com.talentflow.repository.BlockedPhoneNumberRepository;
 import com.talentflow.repository.JobRepository;
 import com.talentflow.repository.ResumeRepository;
 import com.talentflow.repository.RoleRepository;
@@ -52,6 +54,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final CandidateRepository candidateRepository;
     private final CandidateStatusHistoryRepository candidateStatusHistoryRepository;
+    private final BlockedPhoneNumberRepository blockedPhoneNumberRepository;
     private final ResumeRepository resumeRepository;
     private final JobRepository jobRepository;
     private final PasswordEncoder passwordEncoder;
@@ -63,6 +66,7 @@ public class AuthService {
             RoleRepository roleRepository,
             CandidateRepository candidateRepository,
             CandidateStatusHistoryRepository candidateStatusHistoryRepository,
+            BlockedPhoneNumberRepository blockedPhoneNumberRepository,
             ResumeRepository resumeRepository,
             JobRepository jobRepository,
             PasswordEncoder passwordEncoder,
@@ -72,6 +76,7 @@ public class AuthService {
         this.roleRepository = roleRepository;
         this.candidateRepository = candidateRepository;
         this.candidateStatusHistoryRepository = candidateStatusHistoryRepository;
+        this.blockedPhoneNumberRepository = blockedPhoneNumberRepository;
         this.resumeRepository = resumeRepository;
         this.jobRepository = jobRepository;
         this.passwordEncoder = passwordEncoder;
@@ -82,15 +87,22 @@ public class AuthService {
     @Transactional
     public RegistrationResponse register(RegistrationRequest request, MultipartFile resumeFile) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
+        String phone;
         try {
-            if (!PhoneNumberUtil.getInstance().isValidNumber(
-                    PhoneNumberUtil.getInstance().parse(request.phone(), null))) {
+            var phoneNumber = PhoneNumberUtil.getInstance().parse(request.phone(), null);
+            if (!PhoneNumberUtil.getInstance().isValidNumber(phoneNumber)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Enter a valid phone number for the selected country");
             }
+            phone = PhoneNumberUtil.getInstance().format(
+                    phoneNumber, PhoneNumberUtil.PhoneNumberFormat.E164);
         } catch (NumberParseException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Enter a valid phone number with country code, for example +14155552671", exception);
+        }
+        if (blockedPhoneNumberRepository.existsByPhoneNumber(phone)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This phone number cannot register on this demo server");
         }
         if (userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
@@ -110,7 +122,7 @@ public class AuthService {
         user.setFirstName(request.firstName().trim());
         user.setLastName(request.lastName().trim());
         user.setEmail(email);
-        user.setPhone(request.phone());
+        user.setPhone(phone);
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setRoles(Set.of(candidateRole));
 
@@ -180,6 +192,16 @@ public class AuthService {
         Candidate candidate = candidateRepository.findById(candidateId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate not found"));
         User user = candidate.getUser();
+        String phone = candidate.getMobileNumber();
+        if (phone == null || phone.isBlank()) {
+            phone = user == null ? null : user.getPhone();
+        }
+        if (phone != null && !phone.isBlank()
+                && !blockedPhoneNumberRepository.existsByPhoneNumber(phone)) {
+            BlockedPhoneNumber blockedPhoneNumber = new BlockedPhoneNumber();
+            blockedPhoneNumber.setPhoneNumber(phone);
+            blockedPhoneNumberRepository.save(blockedPhoneNumber);
+        }
         List<String> resumePaths = candidate.getResumes().stream()
                 .map(Resume::getStoragePath)
                 .toList();

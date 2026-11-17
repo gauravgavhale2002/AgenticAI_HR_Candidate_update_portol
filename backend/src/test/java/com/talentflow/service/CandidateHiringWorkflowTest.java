@@ -8,12 +8,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.talentflow.dto.CandidateHiringStatusUpdateRequest;
+import com.talentflow.dto.RegistrationRequest;
 import com.talentflow.dto.RegisteredCandidateResponse;
 import com.talentflow.entity.Candidate;
 import com.talentflow.entity.CandidateStatusHistory;
+import com.talentflow.entity.BlockedPhoneNumber;
 import com.talentflow.entity.Resume;
 import com.talentflow.entity.User;
 import com.talentflow.enums.CandidateHiringStatus;
+import com.talentflow.repository.BlockedPhoneNumberRepository;
 import com.talentflow.repository.CandidateRepository;
 import com.talentflow.repository.CandidateStatusHistoryRepository;
 import com.talentflow.repository.JobRepository;
@@ -28,6 +31,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +41,7 @@ class CandidateHiringWorkflowTest {
     @Mock private RoleRepository roleRepository;
     @Mock private CandidateRepository candidateRepository;
     @Mock private CandidateStatusHistoryRepository historyRepository;
+    @Mock private BlockedPhoneNumberRepository blockedPhoneNumberRepository;
     @Mock private ResumeRepository resumeRepository;
     @Mock private JobRepository jobRepository;
     @Mock private PasswordEncoder passwordEncoder;
@@ -53,6 +58,7 @@ class CandidateHiringWorkflowTest {
                 roleRepository,
                 candidateRepository,
                 historyRepository,
+                blockedPhoneNumberRepository,
                 resumeRepository,
                 jobRepository,
                 passwordEncoder,
@@ -63,6 +69,7 @@ class CandidateHiringWorkflowTest {
         candidate.setFirstName("Test");
         candidate.setLastName("Candidate");
         candidate.setEmail("candidate@example.com");
+        candidate.setMobileNumber("+14155552671");
         candidate.setHiringStatus(CandidateHiringStatus.IN_REVIEW);
     }
 
@@ -145,9 +152,13 @@ class CandidateHiringWorkflowTest {
         Resume resume = new Resume();
         resume.setStoragePath("uploads/resumes/test.pdf");
         candidate.getResumes().add(resume);
+        when(blockedPhoneNumberRepository.existsByPhoneNumber("+14155552671")).thenReturn(false);
 
         authService.deleteCandidate(7L);
 
+        ArgumentCaptor<BlockedPhoneNumber> blockedPhone = ArgumentCaptor.forClass(BlockedPhoneNumber.class);
+        verify(blockedPhoneNumberRepository).save(blockedPhone.capture());
+        assertEquals("+14155552671", blockedPhone.getValue().getPhoneNumber());
         verify(candidateRepository).delete(candidate);
         verify(userRepository).delete(user);
         verify(resumeStorageService).delete("uploads/resumes/test.pdf");
@@ -162,5 +173,28 @@ class CandidateHiringWorkflowTest {
                 () -> authService.deleteCandidate(99L));
 
         assertEquals(404, error.getStatusCode().value());
+    }
+
+    @Test
+    void blocksRegistrationFromADeletedCandidatePhoneNumber() {
+        when(blockedPhoneNumberRepository.existsByPhoneNumber("+14155552671")).thenReturn(true);
+        RegistrationRequest request = new RegistrationRequest(
+                "Test",
+                "Candidate",
+                "new@example.com",
+                "password123",
+                "+14155552671",
+                "Software Developer",
+                2,
+                java.util.List.of("Java"));
+        MockMultipartFile resume = new MockMultipartFile(
+                "resume", "resume.pdf", "application/pdf", new byte[] {1});
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> authService.register(request, resume));
+
+        assertEquals(403, error.getStatusCode().value());
+        verify(userRepository, org.mockito.Mockito.never()).save(any(User.class));
     }
 }
