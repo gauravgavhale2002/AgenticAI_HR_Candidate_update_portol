@@ -32,15 +32,21 @@ import java.util.Locale;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AuthService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -167,6 +173,39 @@ public class AuthService {
                 .sorted((left, right) -> right.getCreatedAt().compareTo(left.getCreatedAt()))
                 .map(this::toRegisteredCandidateResponse)
                 .toList();
+    }
+
+    @Transactional
+    public void deleteCandidate(Long candidateId) {
+        Candidate candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate not found"));
+        User user = candidate.getUser();
+        List<String> resumePaths = candidate.getResumes().stream()
+                .map(Resume::getStoragePath)
+                .toList();
+
+        candidateRepository.delete(candidate);
+        if (user != null) {
+            userRepository.delete(user);
+        }
+
+        Runnable deleteResumeFiles = () -> resumePaths.forEach(path -> {
+            try {
+                resumeStorageService.delete(path);
+            } catch (IOException exception) {
+                logger.error("Could not delete resume file for deleted candidate {}", candidateId, exception);
+            }
+        });
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    deleteResumeFiles.run();
+                }
+            });
+        } else {
+            deleteResumeFiles.run();
+        }
     }
 
     @Transactional(readOnly = true)

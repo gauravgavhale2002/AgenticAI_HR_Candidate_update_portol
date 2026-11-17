@@ -11,6 +11,8 @@ import com.talentflow.dto.CandidateHiringStatusUpdateRequest;
 import com.talentflow.dto.RegisteredCandidateResponse;
 import com.talentflow.entity.Candidate;
 import com.talentflow.entity.CandidateStatusHistory;
+import com.talentflow.entity.Resume;
+import com.talentflow.entity.User;
 import com.talentflow.enums.CandidateHiringStatus;
 import com.talentflow.repository.CandidateRepository;
 import com.talentflow.repository.CandidateStatusHistoryRepository;
@@ -62,11 +64,11 @@ class CandidateHiringWorkflowTest {
         candidate.setLastName("Candidate");
         candidate.setEmail("candidate@example.com");
         candidate.setHiringStatus(CandidateHiringStatus.IN_REVIEW);
-        when(candidateRepository.findById(7L)).thenReturn(Optional.of(candidate));
     }
 
     @Test
     void advancesCandidateToFirstRoundAndRecordsAuditHistory() {
+        when(candidateRepository.findById(7L)).thenReturn(Optional.of(candidate));
         when(candidateRepository.save(any(Candidate.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(resumeRepository.findFirstByCandidateIdOrderByUploadedAtDesc(7L)).thenReturn(Optional.empty());
         RegisteredCandidateResponse response = authService.updateHiringStatus(
@@ -85,6 +87,7 @@ class CandidateHiringWorkflowTest {
 
     @Test
     void rejectsSkippingHiringStages() {
+        when(candidateRepository.findById(7L)).thenReturn(Optional.of(candidate));
         ResponseStatusException error = assertThrows(
                 ResponseStatusException.class,
                 () -> authService.updateHiringStatus(
@@ -98,6 +101,7 @@ class CandidateHiringWorkflowTest {
 
     @Test
     void requiresManagerFeedbackBeforeClearingManagerRound() {
+        when(candidateRepository.findById(7L)).thenReturn(Optional.of(candidate));
         candidate.setHiringStatus(CandidateHiringStatus.SELECTED_FOR_MANAGER_ROUND);
 
         ResponseStatusException error = assertThrows(
@@ -114,6 +118,7 @@ class CandidateHiringWorkflowTest {
 
     @Test
     void savesManagerFeedbackWhenClearingManagerRound() {
+        when(candidateRepository.findById(7L)).thenReturn(Optional.of(candidate));
         candidate.setHiringStatus(CandidateHiringStatus.SELECTED_FOR_MANAGER_ROUND);
         when(candidateRepository.save(any(Candidate.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(resumeRepository.findFirstByCandidateIdOrderByUploadedAtDesc(7L)).thenReturn(Optional.empty());
@@ -129,5 +134,33 @@ class CandidateHiringWorkflowTest {
         ArgumentCaptor<CandidateStatusHistory> history = ArgumentCaptor.forClass(CandidateStatusHistory.class);
         verify(historyRepository).save(history.capture());
         assertTrue(history.getValue().getRemarks().contains("Manager feedback: Strong technical skills"));
+    }
+
+    @Test
+    void deletesCandidateAccountAndStoredResume() throws Exception {
+        when(candidateRepository.findById(7L)).thenReturn(Optional.of(candidate));
+        User user = new User();
+        user.setId(9L);
+        candidate.setUser(user);
+        Resume resume = new Resume();
+        resume.setStoragePath("uploads/resumes/test.pdf");
+        candidate.getResumes().add(resume);
+
+        authService.deleteCandidate(7L);
+
+        verify(candidateRepository).delete(candidate);
+        verify(userRepository).delete(user);
+        verify(resumeStorageService).delete("uploads/resumes/test.pdf");
+    }
+
+    @Test
+    void reportsWhenDeletingAnUnknownCandidate() {
+        when(candidateRepository.findById(99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> authService.deleteCandidate(99L));
+
+        assertEquals(404, error.getStatusCode().value());
     }
 }

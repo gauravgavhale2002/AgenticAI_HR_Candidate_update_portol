@@ -66,4 +66,12 @@ public class ResumeStorageService {
         }
         return path;
     }
+
+    public void delete(String storedPath) throws IOException {
+        Path path = Paths.get(storedPath).toAbsolutePath().normalize();
+        if (!path.startsWith(resumeDirectory)) {
+            throw new IOException("Invalid resume storage path");
+        }
+        Files.deleteIfExists(path);
+    }
 }

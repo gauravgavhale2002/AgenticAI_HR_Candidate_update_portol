@@ -161,6 +161,7 @@ export default function App() {
   const [hrError, setHrError] = useState('')
   const [candidates, setCandidates] = useState<RegisteredCandidate[] | null>(null)
   const [selectedCandidate, setSelectedCandidate] = useState<RegisteredCandidate | null>(null)
+  const [deletingCandidateId, setDeletingCandidateId] = useState<number | null>(null)
   const [hrNotes, setHrNotes] = useState('')
   const [managerFeedback, setManagerFeedback] = useState('')
   const [resumePreview, setResumePreview] = useState<{ url: string; fileName: string } | null>(null)
@@ -341,6 +342,34 @@ export default function App() {
       setManagerFeedback('')
     } catch (error) {
       setHrError(error instanceof Error ? error.message : 'Unable to reach the server.')
+    }
+  }
+
+  async function deleteCandidate(candidate: RegisteredCandidate) {
+    if (!window.confirm(`Permanently delete ${candidate.firstName} ${candidate.lastName} and their application data and resume?`)) {
+      return
+    }
+
+    setHrError('')
+    setDeletingCandidateId(candidate.id)
+    try {
+      const response = await fetch(`/api/hr/candidates/${candidate.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Basic ${btoa(`${hrUsername}:${hrPassword}`)}`,
+        },
+      })
+      if (!response.ok) {
+        throw new Error(response.status === 401 || response.status === 403
+          ? 'HR sign-in failed. Please sign in again.'
+          : 'Could not delete this candidate.')
+      }
+      setCandidates((current) => current?.filter((item) => item.id !== candidate.id) ?? current)
+      setSelectedCandidate((current) => current?.id === candidate.id ? null : current)
+    } catch (error) {
+      setHrError(error instanceof Error ? error.message : 'Unable to reach the server.')
+    } finally {
+      setDeletingCandidateId(null)
     }
   }
 
@@ -772,7 +801,7 @@ export default function App() {
                         <th className="px-6 py-3 font-medium">Email</th>
                         <th className="px-6 py-3 font-medium">Skills</th>
                         <th className="px-6 py-3 font-medium">Hiring stage</th>
-                        <th className="px-6 py-3 font-medium">Profile</th>
+                        <th className="px-6 py-3 font-medium">Actions</th>
                         <th className="px-6 py-3 font-medium">Registered</th>
                       </tr>
                     </thead>
@@ -790,7 +819,17 @@ export default function App() {
                             }`}>{getStageLabel(candidate.hiringStatus)}</span>
                           </td>
                           <td className="px-6 py-4">
-                            <button type="button" onClick={() => { setSelectedCandidate(candidate); setHrNotes(''); setManagerFeedback(candidate.managerFeedback ?? '') }} className="text-indigo-300 hover:text-indigo-200">Review profile</button>
+                            <div className="flex items-center gap-4">
+                              <button type="button" onClick={() => { setSelectedCandidate(candidate); setHrNotes(''); setManagerFeedback(candidate.managerFeedback ?? '') }} className="text-indigo-300 hover:text-indigo-200">Review profile</button>
+                              <button
+                                type="button"
+                                disabled={deletingCandidateId !== null}
+                                onClick={() => void deleteCandidate(candidate)}
+                                className="text-rose-300 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {deletingCandidateId === candidate.id ? 'Deleting…' : 'Delete'}
+                              </button>
+                            </div>
                           </td>
                           <td className="px-6 py-4">{new Date(candidate.registeredAt).toLocaleString()}</td>
                         </tr>
