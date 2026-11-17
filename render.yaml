@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: talentflowai-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: HR_USERNAME
+        value: manager
+      - key: HR_PASSWORD
+        generateValue: true

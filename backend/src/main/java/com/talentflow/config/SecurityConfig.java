@@ -26,6 +26,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/hr/**").hasRole("ADMIN")
+                        .requestMatchers("/", "/index.html", "/register", "/profile", "/hr",
+                                "/assets/**", "/favicon.svg", "/icons.svg").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(basic -> basic.authenticationEntryPoint(
                         (request, response, exception) -> response.setStatus(HttpStatus.UNAUTHORIZED.value())))

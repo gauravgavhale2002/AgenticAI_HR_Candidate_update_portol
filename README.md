@@ -33,7 +33,17 @@ npm ci
 npm run dev
 ```
 
-Open the Vite URL printed in the terminal (normally `http://localhost:5173`). The frontend development server proxies API requests to the backend.
+Open the HTTPS Vite URL printed in the terminal (normally `https://localhost:5173`). Vite uses a locally trusted development certificate. If port 5173 is already in use, Vite uses the next available port. The frontend development server proxies API requests to the backend.
+
+## Deploy a public demo for free
+
+The Render Blueprint in `render.yaml` builds the frontend and Spring Boot API into one HTTPS web service. To deploy:
+
+1. Push this project to a GitHub repository that your Render account can access.
+2. In Render, choose **New → Blueprint**, connect the repository, and deploy the `render.yaml` Blueprint.
+3. Open the generated service URL. The HR username is `manager`; Render generates the HR password, which you can view in the service's environment settings.
+
+This free demo uses an in-memory database and temporary local file storage. Data and uploaded resumes may be lost when the service restarts or redeploys, and the free service may take a little while to wake after inactivity. Use fake candidate information and sample resumes only; do not use real personal data. Share the generated HR password securely with your manager, not in this repository.
 
 ## Verify
 
