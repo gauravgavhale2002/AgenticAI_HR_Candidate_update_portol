@@ -485,6 +485,9 @@ export default function App() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => null) as { message?: string; detail?: string; title?: string } | null
+        if (response.status === 409) {
+          throw new Error('An account with this email already exists. Please sign in or register with a different email.')
+        }
         throw new Error(error?.detail ?? error?.message ?? error?.title ?? 'Registration failed. Please try again.')
       }
 
@@ -546,11 +549,11 @@ export default function App() {
                     <div className="grid gap-5 sm:grid-cols-2">
                       <label className="block text-sm text-slate-300">
                         First name
-                        <input required name="firstName" autoComplete="given-name" maxLength={80} pattern="[\p{L}][\p{L}\p{M} .'-]*" title="Use letters only; spaces, hyphens, apostrophes, and periods are allowed." className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-indigo-400" />
+                        <input required name="firstName" autoComplete="given-name" maxLength={80} pattern="[\p{L}][\p{L}\p{M} .'\-]*" title="Use letters only; spaces, hyphens, apostrophes, and periods are allowed." className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-indigo-400" />
                       </label>
                       <label className="block text-sm text-slate-300">
                         Last name
-                        <input required name="lastName" autoComplete="family-name" maxLength={80} pattern="[\p{L}][\p{L}\p{M} .'-]*" title="Use letters only; spaces, hyphens, apostrophes, and periods are allowed." className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-indigo-400" />
+                        <input required name="lastName" autoComplete="family-name" maxLength={80} pattern="[\p{L}][\p{L}\p{M} .'\-]*" title="Use letters only; spaces, hyphens, apostrophes, and periods are allowed." className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-indigo-400" />
                       </label>
                     </div>
                     <label className="block text-sm text-slate-300">
