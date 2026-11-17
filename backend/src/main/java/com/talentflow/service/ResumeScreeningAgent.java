@@ -26,6 +26,11 @@ public class ResumeScreeningAgent {
             "offer of employment", "employment offer", "letter of offer", "offer letter",
             "we are pleased to offer", "we are delighted to offer", "joining date",
             "annual compensation", "terms of employment", "accept this offer");
+    private static final List<Pattern> PROFANITY_PATTERNS = List.of(
+            Pattern.compile("(?i)\\b(?:fuck(?:ing|ed|er|ers)?|shit(?:ty|ting)?|asshole|bitch(?:es)?|bastard)\\b"));
+    private static final List<Pattern> EXPLICIT_CONTENT_PATTERNS = List.of(
+            Pattern.compile("(?i)\\b(?:porn(?:ography|ographic)?|xxx|nudes?)\\b"),
+            Pattern.compile("(?i)\\b(?:explicit sexual content|sex video|nude photo)\\b"));
     private static final List<String> SKILL_TERMS = List.of(
             "Java", "Python", "JavaScript", "TypeScript", "C++", "C#", "Go", "Ruby", "PHP",
             "Spring Boot", "Spring", "React", "Angular", "Vue", "Node.js", "Express",
@@ -90,7 +95,31 @@ public class ResumeScreeningAgent {
         String summary = "CV indicators found: " + resumeSignalCount
                 + "; skills detected: " + extractedSkills.size()
                 + (extractedExperience == null ? "." : "; stated experience: " + extractedExperience + " years.");
-        return new ScreeningResult(text, extractedSkills, extractedExperience, confidence, summary);
+        List<String> reviewFlags = new ArrayList<>(detectContentIssues(text));
+        if (extractedSkills.isEmpty() || extractedExperience == null) {
+            List<String> missingDetails = new ArrayList<>();
+            if (extractedSkills.isEmpty()) {
+                missingDetails.add("supported skills");
+            }
+            if (extractedExperience == null) {
+                missingDetails.add("clearly stated years of experience");
+            }
+            reviewFlags.add("Resume may be incomplete: " + String.join(" and ", missingDetails)
+                    + " could not be detected. Please review manually.");
+        }
+        return new ScreeningResult(text, extractedSkills, extractedExperience, confidence, summary, reviewFlags);
+    }
+
+    public List<String> detectContentIssues(String... content) {
+        String combined = String.join(" ", content).toLowerCase(Locale.ROOT);
+        List<String> issues = new ArrayList<>();
+        if (PROFANITY_PATTERNS.stream().anyMatch(pattern -> pattern.matcher(combined).find())) {
+            issues.add("Potential abusive or profane language detected; review manually.");
+        }
+        if (EXPLICIT_CONTENT_PATTERNS.stream().anyMatch(pattern -> pattern.matcher(combined).find())) {
+            issues.add("Potential sexually explicit content detected; review manually.");
+        }
+        return List.copyOf(issues);
     }
 
     List<String> extractSkills(String normalizedText) {
@@ -118,7 +147,8 @@ public class ResumeScreeningAgent {
             List<String> extractedSkills,
             Integer experienceYears,
             int confidence,
-            String summary
+            String summary,
+            List<String> reviewFlags
     ) {
     }
 }

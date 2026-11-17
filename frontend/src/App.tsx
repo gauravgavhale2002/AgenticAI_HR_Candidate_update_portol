@@ -18,6 +18,7 @@ type RegisteredCandidate = {
   cvExperienceYears: number | null
   resumeScreeningScore: number | null
   resumeScreeningSummary: string | null
+  reviewFlags: string[]
   hiringStatus: HiringStatus
   hiringStatusUpdatedAt: string | null
   managerFeedback: string | null
@@ -923,6 +924,31 @@ export default function App() {
               {selectedCandidate.resumeScreeningSummary && (
                 <p className="mt-2 text-sm text-slate-400">{selectedCandidate.resumeScreeningSummary}</p>
               )}
+              <section className={`mt-5 rounded-xl border p-4 ${
+                selectedCandidate.reviewFlags.length > 0
+                  ? 'border-amber-500/40 bg-amber-500/10'
+                  : 'border-slate-700 bg-slate-950/40'
+              }`} aria-live="polite">
+                <h3 className={`font-semibold ${
+                  selectedCandidate.reviewFlags.length > 0 ? 'text-amber-200' : 'text-slate-200'
+                }`}>
+                  Automated content review · rules-based
+                </h3>
+                {selectedCandidate.reviewFlags.length > 0 ? (
+                  <>
+                    <p className="mt-1 text-sm text-amber-100/80">
+                      Attention recommended. These checks can be wrong or miss content; review the profile and resume yourself before taking action.
+                    </p>
+                    <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-amber-100">
+                      {selectedCandidate.reviewFlags.map((flag) => <li key={flag}>{flag}</li>)}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-400">
+                    No configured content or completeness flags found. This is not a guarantee that the profile is appropriate or complete; review manually.
+                  </p>
+                )}
+              </section>
               <h3 className="mt-6 text-sm font-medium uppercase tracking-wide text-slate-400">Job matches based on CV skills</h3>
               {selectedCandidate.jobMatches.length > 0 ? (
                 <div className="mt-3 space-y-3">

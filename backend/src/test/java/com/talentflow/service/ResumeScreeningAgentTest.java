@@ -63,6 +63,45 @@ class ResumeScreeningAgentTest {
         assertTrue(error.getReason().contains("could not verify this as a CV"));
     }
 
+    @Test
+    void flagsProfanityAndSexuallyExplicitTermsForHrReview() throws IOException {
+        MockMultipartFile resume = pdf("resume.pdf",
+                "PROFESSIONAL SUMMARY Software engineer with 5 years of professional experience. "
+                        + "TECHNICAL SKILLS Java Spring Boot React SQL. "
+                        + "WORK EXPERIENCE Built APIs and applications. EDUCATION Bachelor of Science. "
+                        + "This is an asshole profile containing pornography. ".repeat(3));
+
+        ResumeScreeningAgent.ScreeningResult result = agent.analyze(resume);
+
+        assertTrue(result.reviewFlags().stream().anyMatch(flag -> flag.contains("abusive or profane")));
+        assertTrue(result.reviewFlags().stream().anyMatch(flag -> flag.contains("sexually explicit")));
+    }
+
+    @Test
+    void flagsResumesWithInsufficientlySpecifiedExperienceOrSkills() throws IOException {
+        MockMultipartFile resume = pdf("resume.pdf",
+                "PROFESSIONAL SUMMARY Experienced team member. WORK EXPERIENCE "
+                        + "EDUCATION Bachelor of Arts. PROJECTS listed below. ".repeat(4));
+
+        ResumeScreeningAgent.ScreeningResult result = agent.analyze(resume);
+
+        assertTrue(result.reviewFlags().stream().anyMatch(flag -> flag.contains("may be incomplete")));
+    }
+
+    @Test
+    void flagsInappropriateRegistrationProfileText() {
+        List<String> flags = agent.detectContentIssues(
+                "Example",
+                "Person",
+                "developer@example.com",
+                "software engineer",
+                "Java and React");
+
+        assertTrue(flags.isEmpty());
+        assertTrue(agent.detectContentIssues("asshole").stream()
+                .anyMatch(flag -> flag.contains("abusive or profane")));
+    }
+
     private MockMultipartFile pdf(String name, String text) throws IOException {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PDPage page = new PDPage();

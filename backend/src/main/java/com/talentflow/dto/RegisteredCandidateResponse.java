@@ -20,6 +20,7 @@ public record RegisteredCandidateResponse(
         Integer cvExperienceYears,
         Integer resumeScreeningScore,
         String resumeScreeningSummary,
+        List<String> reviewFlags,
         List<JobMatchSummary> jobMatches,
         CandidateHiringStatus hiringStatus,
         LocalDateTime hiringStatusUpdatedAt,

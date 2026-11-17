@@ -42,6 +42,9 @@ public class Resume extends BaseEntity {
     @Column(length = 1500)
     private String screeningSummary;
 
+    @Column(length = 1500)
+    private String reviewFlags;
+
     @Column(length = 2000)
     private String extractedSkills;
 

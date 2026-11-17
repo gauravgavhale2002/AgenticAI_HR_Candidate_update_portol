@@ -58,3 +58,7 @@ npm run build
 ## Candidate validation
 
 Candidate registration validates names, email, country-specific phone numbers, skills, and job titles in the frontend and backend. Phone numbers are stored in international format. Each skill and job title must contain at least one letter; version numbers are allowed (for example, `Java8` and `Spring Boot Developer 3.8`).
+
+## HR content review flags
+
+Resume screening adds advisory flags when its local rules detect configured profane or sexually explicit terms, or when supported skills or stated experience are missing from the extracted CV text. HR can review the resume, reject the candidate, or delete the profile using the existing actions. These checks are rule-based rather than an AI model; they can miss content or flag context incorrectly. A flag never automatically rejects or deletes an applicant. Do not rely on these demo checks as a complete moderation or safety system.
