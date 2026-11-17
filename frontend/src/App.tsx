@@ -19,6 +19,7 @@ type RegisteredCandidate = {
   resumeScreeningScore: number | null
   resumeScreeningSummary: string | null
   reviewFlags: string[]
+  careerInsights: string[]
   hiringStatus: HiringStatus
   hiringStatusUpdatedAt: string | null
   managerFeedback: string | null
@@ -924,6 +925,15 @@ export default function App() {
               {selectedCandidate.resumeScreeningSummary && (
                 <p className="mt-2 text-sm text-slate-400">{selectedCandidate.resumeScreeningSummary}</p>
               )}
+              <section className="mt-5 rounded-xl border border-slate-700 bg-slate-950/40 p-4">
+                <h3 className="font-semibold text-slate-200">CV career insights · keyword/date rules</h3>
+                <p className="mt-1 text-sm text-slate-400">
+                  These are approximate text-based clues, not verified employment or skill proficiency. Confirm against the CV and interview.
+                </p>
+                <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-slate-300">
+                  {selectedCandidate.careerInsights.map((insight) => <li key={insight}>{insight}</li>)}
+                </ul>
+              </section>
               <section className={`mt-5 rounded-xl border p-4 ${
                 selectedCandidate.reviewFlags.length > 0
                   ? 'border-amber-500/40 bg-amber-500/10'

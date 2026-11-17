@@ -110,6 +110,8 @@ public class AuthService {
         String resumeContentType = resumeStorageService.validateAndGetContentType(resumeFile);
         ResumeScreeningAgent.ScreeningResult screening = resumeScreeningAgent.analyze(resumeFile);
         List<String> reviewFlags = new java.util.ArrayList<>(screening.reviewFlags());
+        reviewFlags.addAll(resumeScreeningAgent.compareExperience(
+                request.experienceYears(), screening.experienceYears(), screening.timelineExperienceYears()));
         reviewFlags.addAll(resumeScreeningAgent.detectContentIssues(
                 request.firstName(),
                 request.lastName(),
@@ -169,6 +171,7 @@ public class AuthService {
             resume.setUploadedAt(LocalDateTime.now());
             resume.setScreeningSummary(screening.summary());
             resume.setReviewFlags(reviewFlags.isEmpty() ? null : String.join("\n", reviewFlags));
+            resume.setCareerInsights(String.join("\n", screening.careerInsights()));
             resume.setExtractedSkills(String.join(",", screening.extractedSkills()));
             resume.setExtractedExperienceYears(screening.experienceYears());
             resume.setScreeningScore(screening.confidence());
@@ -329,6 +332,9 @@ public class AuthService {
                 resume == null || resume.getReviewFlags() == null || resume.getReviewFlags().isBlank()
                         ? List.of()
                         : List.of(resume.getReviewFlags().split("\n")),
+                resume == null || resume.getCareerInsights() == null || resume.getCareerInsights().isBlank()
+                        ? List.of()
+                        : List.of(resume.getCareerInsights().split("\n")),
                 resume == null ? List.of() : matchJobs(resume.getExtractedSkills()),
                 candidate.getHiringStatus(),
                 candidate.getHiringStatusUpdatedAt(),
