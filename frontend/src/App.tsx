@@ -452,7 +452,15 @@ export default function App() {
 
     const resume = formData.get('resume')
     if (!(resume instanceof File) || resume.size === 0) {
-      setRegistrationError('Please attach your resume.')
+      setRegistrationError('Please attach your CV/resume as a text-based PDF. Certificates and other documents are not accepted.')
+      return
+    }
+    if (!resume.name.toLowerCase().endsWith('.pdf')) {
+      setRegistrationError('Please upload your CV/resume as a PDF. Word documents, certificates, and other file types are not supported.')
+      return
+    }
+    if (resume.size > 10 * 1024 * 1024) {
+      setRegistrationError('Your CV/resume PDF must be 10 MB or smaller.')
       return
     }
     const skills = String(formData.get('skills')).split(',').map((skill) => skill.trim()).filter(Boolean)
@@ -484,11 +492,27 @@ export default function App() {
       })
 
       if (!response.ok) {
-        const error = await response.json().catch(() => null) as { message?: string; detail?: string; title?: string } | null
+        const error = await response.json().catch(() => null) as {
+          message?: string
+          detail?: string
+          title?: string
+          details?: Record<string, string>
+        } | null
         if (response.status === 409) {
           throw new Error('An account with this email already exists. Please sign in or register with a different email.')
         }
-        throw new Error(error?.detail ?? error?.message ?? error?.title ?? 'Registration failed. Please try again.')
+        const validationDetails = error?.details ? Object.values(error.details).join(' ') : ''
+        const serverMessage = error?.detail ?? error?.message ?? validationDetails ?? error?.title
+        if (serverMessage) {
+          throw new Error(serverMessage)
+        }
+        if (response.status === 422) {
+          throw new Error('This document does not look like a CV/resume. Please upload a proper text-based PDF CV; certificates are not accepted.')
+        }
+        if (response.status >= 500) {
+          throw new Error('The server could not process your registration right now. Please try again shortly.')
+        }
+        throw new Error('Registration could not be completed. Check your details and upload a proper PDF CV/resume.')
       }
 
       setCandidateEmail(email)
@@ -589,8 +613,9 @@ export default function App() {
                       </label>
                     </div>
                     <label className="block text-sm text-slate-300">
-                      CV / Resume (text-based PDF only, max 10 MB; offer letters are rejected)
-                      <input required type="file" name="resume" accept=".pdf,application/pdf" className="mt-2 block w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500 file:px-4 file:py-2 file:font-medium file:text-white" />
+                      CV / Resume (text-based PDF only, max 10 MB; certificates and offer letters are not accepted)
+                      <input required type="file" name="resume" accept=".pdf,application/pdf" aria-describedby="resume-help" onChange={() => setRegistrationError('')} className="mt-2 block w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500 file:px-4 file:py-2 file:font-medium file:text-white" />
+                      <span id="resume-help" className="mt-2 block text-xs text-slate-500">Upload a proper text-based CV/resume in PDF format. Word files and certificates are not supported.</span>
                     </label>
                     <div className="grid gap-5 sm:grid-cols-2">
                       <label className="block text-sm text-slate-300">

@@ -39,7 +39,8 @@ public class ResumeStorageService {
                 ? ""
                 : originalName.substring(originalName.lastIndexOf('.')).toLowerCase(Locale.ROOT);
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Resume must be a PDF file");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Please upload your CV/resume as a PDF. Word documents, certificates, and other file types are not supported.");
         }
 
         return MediaType.APPLICATION_PDF_VALUE;

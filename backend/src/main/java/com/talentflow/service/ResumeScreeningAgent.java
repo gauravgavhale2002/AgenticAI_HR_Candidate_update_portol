@@ -137,7 +137,8 @@ public class ResumeScreeningAgent {
         long resumeSignalCount = RESUME_SIGNALS.stream().filter(normalized::contains).count();
         if (resumeSignalCount < 2) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "We could not verify this as a CV. Include work experience, education, skills, or projects and upload again.");
+                    "This document does not look like a CV or resume. Certificates and other documents are not accepted. "
+                            + "Please upload a proper text-based CV/resume as a PDF, including work experience, education, skills, or projects.");
         }
 
         List<String> extractedSkills = extractSkills(normalized);

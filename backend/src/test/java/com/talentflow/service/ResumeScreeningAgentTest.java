@@ -64,7 +64,8 @@ class ResumeScreeningAgentTest {
                 () -> agent.analyze(unrelated));
 
         assertEquals(422, error.getStatusCode().value());
-        assertTrue(error.getReason().contains("could not verify this as a CV"));
+        assertTrue(error.getReason().contains("does not look like a CV or resume"));
+        assertTrue(error.getReason().contains("Certificates and other documents are not accepted"));
     }
 
     @Test
