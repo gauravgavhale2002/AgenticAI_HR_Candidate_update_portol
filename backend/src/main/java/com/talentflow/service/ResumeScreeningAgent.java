@@ -37,6 +37,10 @@ public class ResumeScreeningAgent {
             "offer of employment", "employment offer", "letter of offer", "offer letter",
             "we are pleased to offer", "we are delighted to offer", "joining date",
             "annual compensation", "terms of employment", "accept this offer");
+    private static final Set<String> NON_CV_DOCUMENT_SIGNALS = Set.of(
+            "joining booklet", "onboarding booklet", "employee booklet", "induction booklet",
+            "employee handbook", "personal details form", "joining formalities",
+            "employee information form", "nomination form");
     private static final List<Pattern> PROFANITY_PATTERNS = List.of(
             Pattern.compile("(?i)\\b(?:fuck(?:ing|ed|er|ers)?|shit(?:ty|ting)?|asshole|bitch(?:es)?|bastard)\\b"));
     private static final List<Pattern> EXPLICIT_CONTENT_PATTERNS = List.of(
@@ -85,6 +89,8 @@ public class ResumeScreeningAgent {
     private static final Pattern EXPERIENCE_PATTERN = Pattern.compile(
             "(?i)\\b(\\d{1,2})\\s*\\+?\\s*(?:years?|yrs?)\\s+(?:of\\s+)?(?:professional\\s+)?experience\\b");
     private static final Pattern PDF_SIGNATURE = Pattern.compile("^%PDF-");
+    private static final Pattern BOOKLET_FILE_NAME_PATTERN =
+            Pattern.compile("(?i)(?:^|[^a-z])booklet(?:[^a-z]|$)");
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
 
     public ScreeningResult analyze(MultipartFile file) {
@@ -128,6 +134,13 @@ public class ResumeScreeningAgent {
         }
 
         String normalized = text.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        String originalFileName = file.getOriginalFilename();
+        if (isBookletFileName(originalFileName)
+                || NON_CV_DOCUMENT_SIGNALS.stream().anyMatch(normalized::contains)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "This document appears to be a booklet or joining form, not a CV. Please upload your own CV/resume PDF.");
+        }
+
         long offerSignalCount = OFFER_SIGNALS.stream().filter(normalized::contains).count();
         if (offerSignalCount > 0) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -169,6 +182,10 @@ public class ResumeScreeningAgent {
         return new ScreeningResult(
                 text, extractedSkills, extractedExperience, timelineExperience,
                 confidence, summary, reviewFlags, careerInsights);
+    }
+
+    private boolean isBookletFileName(String fileName) {
+        return fileName != null && BOOKLET_FILE_NAME_PATTERN.matcher(fileName).find();
     }
 
     private boolean hasEmbeddedImage(PDResources resources, Set<COSStream> visitedForms) {

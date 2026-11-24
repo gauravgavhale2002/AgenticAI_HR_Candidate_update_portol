@@ -1,5 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowLeft, BriefcaseBusiness, CheckCircle2, RefreshCw, ShieldCheck, Sparkles, Trash2, Users } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  BriefcaseBusiness,
+  CheckCircle2,
+  ClipboardCheck,
+  FileText,
+  RefreshCw,
+  ScanSearch,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  UserRound,
+  Users,
+} from 'lucide-react'
 import { getCountries, getCountryCallingCode, isValidPhoneNumber, parsePhoneNumber } from 'libphonenumber-js/max'
 
 type RegisteredCandidate = {
@@ -77,6 +91,10 @@ function getStageLabel(status: HiringStatus) {
   return status === 'REJECTED' ? 'Rejected' : hiringStages.find((stage) => stage.status === status)?.label ?? 'Unknown'
 }
 
+function isBookletFilename(fileName: string) {
+  return /(?:^|[^a-z])booklet(?:[^a-z]|$)/i.test(fileName)
+}
+
 function getNextHiringStatus(status: HiringStatus): HiringStatus | null {
   const index = hiringStages.findIndex((stage) => stage.status === status)
   return index >= 0 && index < hiringStages.length - 1 ? hiringStages[index + 1].status : null
@@ -140,17 +158,57 @@ function HiringProgress({ status }: { status: HiringStatus }) {
 }
 
 const highlights = [
-  { icon: BriefcaseBusiness, title: 'AI-powered hiring', text: 'Resume intelligence and role-fit scoring to improve recruiting quality.' },
-  { icon: ShieldCheck, title: 'Secure workflows', text: 'Role-based access, controlled AI actions, and governed candidate handling.' },
-  { icon: CheckCircle2, title: 'Lifecycle visibility', text: 'Complete recruitment tracking from registration to offer and onboarding.' },
+  { icon: BriefcaseBusiness, title: 'Resume intelligence', text: 'Rules-based CV skill signals and role-fit comparisons give HR useful review context.' },
+  { icon: ShieldCheck, title: 'Protected workflows', text: 'Backend authentication and validated candidate submissions support safer HR review.' },
+  { icon: CheckCircle2, title: 'Lifecycle visibility', text: 'Follow candidate progress from registration through interview stages and offer outcomes.' },
+]
+
+const workflowSteps = [
+  {
+    number: '01',
+    title: 'Candidate',
+    subtitle: 'Profile & resume',
+    description: 'Candidates create a profile, add skills and attach a resume through the registration portal.',
+    icon: UserRound,
+  },
+  {
+    number: '02',
+    title: 'Resume signals',
+    subtitle: 'Rules-based scan',
+    description: 'The backend extracts supported skills and approximate experience clues from PDF text for HR review.',
+    icon: ScanSearch,
+  },
+  {
+    number: '03',
+    title: 'HR review',
+    subtitle: 'Human decision',
+    description: 'HR reviews the profile, resume, skill matches and advisory flags before choosing the next action.',
+    icon: ClipboardCheck,
+  },
+  {
+    number: '04',
+    title: 'Interview stages',
+    subtitle: 'Hiring pipeline',
+    description: 'Track first-round and manager-round progress, with feedback recorded before advancing.',
+    icon: Users,
+  },
+  {
+    number: '05',
+    title: 'Outcome',
+    subtitle: 'Offer or close',
+    description: 'The candidate portal shows the latest hiring status, including an offer or a closed application.',
+    icon: FileText,
+  },
 ]
 
 export default function App() {
+  const [activeWorkflowStep, setActiveWorkflowStep] = useState(0)
   const [showRegistration, setShowRegistration] = useState(() => window.location.pathname === '/register')
   const [showHrDashboard, setShowHrDashboard] = useState(() => window.location.pathname === '/hr')
   const [showCandidatePortal, setShowCandidatePortal] = useState(() => window.location.pathname === '/profile')
   const [registrationError, setRegistrationError] = useState('')
   const [registrationComplete, setRegistrationComplete] = useState(false)
+  const [isRegistering, setIsRegistering] = useState(false)
   const [candidateEmail, setCandidateEmail] = useState('')
   const [candidatePassword, setCandidatePassword] = useState('')
   const [candidatePortal, setCandidatePortal] = useState<CandidatePortal | null>(null)
@@ -459,6 +517,10 @@ export default function App() {
       setRegistrationError('Please upload your CV/resume as a PDF. Word documents, certificates, and other file types are not supported.')
       return
     }
+    if (isBookletFilename(resume.name)) {
+      setRegistrationError('This file looks like a booklet, not a CV. Please choose your CV/resume PDF.')
+      return
+    }
     if (resume.size > 10 * 1024 * 1024) {
       setRegistrationError('Your CV/resume PDF must be 10 MB or smaller.')
       return
@@ -472,6 +534,10 @@ export default function App() {
       setRegistrationError('Each skill must include at least one letter. Numbers and versions are allowed, for example Java8 or SpringBoot3.8.')
       return
     }
+
+    setIsRegistering(true)
+    const requestController = new AbortController()
+    const requestTimeout = window.setTimeout(() => requestController.abort(), 60_000)
 
     try {
       const registration = new FormData()
@@ -489,6 +555,7 @@ export default function App() {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         body: registration,
+        signal: requestController.signal,
       })
 
       if (!response.ok) {
@@ -519,7 +586,16 @@ export default function App() {
       setCandidatePassword(password)
       setRegistrationComplete(true)
     } catch (error) {
-      setRegistrationError(error instanceof Error ? error.message : 'Unable to reach the server. Please try again.')
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setRegistrationError('Registration timed out. Check that the backend is running, then try again.')
+      } else if (error instanceof TypeError) {
+        setRegistrationError('Could not reach the registration service. Start the backend and try again.')
+      } else {
+        setRegistrationError(error instanceof Error ? error.message : 'Unable to complete registration. Please try again.')
+      }
+    } finally {
+      window.clearTimeout(requestTimeout)
+      setIsRegistering(false)
     }
   }
 
@@ -613,9 +689,9 @@ export default function App() {
                       </label>
                     </div>
                     <label className="block text-sm text-slate-300">
-                      CV / Resume (text-based PDF only, max 10 MB; certificates and offer letters are not accepted)
-                      <input required type="file" name="resume" accept=".pdf,application/pdf" aria-describedby="resume-help" onChange={() => setRegistrationError('')} className="mt-2 block w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500 file:px-4 file:py-2 file:font-medium file:text-white" />
-                      <span id="resume-help" className="mt-2 block text-xs text-slate-500">Upload a proper text-based CV/resume in PDF format. Word files and certificates are not supported.</span>
+                      CV / Resume (text-based PDF only, max 10 MB; booklets, forms, certificates, and offer letters are not accepted)
+                      <input required type="file" name="resume" accept=".pdf,application/pdf" aria-describedby="resume-help" onChange={(event) => setRegistrationError(isBookletFilename(event.currentTarget.files?.[0]?.name ?? '') ? 'This file looks like a booklet, not a CV. Please choose your CV/resume PDF.' : '')} className="mt-2 block w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500 file:px-4 file:py-2 file:font-medium file:text-white" />
+                      <span id="resume-help" className="mt-2 block text-xs text-slate-500">Upload your own text-based CV with work experience, skills, education, or projects. Joining booklets/forms, Word files, and certificates are not accepted.</span>
                     </label>
                     <div className="grid gap-5 sm:grid-cols-2">
                       <label className="block text-sm text-slate-300">
@@ -628,8 +704,14 @@ export default function App() {
                       </label>
                     </div>
                     {registrationError && <p className="text-sm text-rose-400" role="alert">{registrationError}</p>}
-                    <button type="submit" className="w-full rounded-xl bg-indigo-500 px-5 py-3 font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400">
-                      Create account
+                    <button
+                      type="submit"
+                      disabled={isRegistering}
+                      aria-busy={isRegistering}
+                      className="w-full rounded-xl bg-indigo-500 px-5 py-3 font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400 disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {isRegistering && <RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />}
+                      {isRegistering ? 'Creating account…' : 'Create account'}
                     </button>
                   </form>
                 </>
@@ -1032,74 +1114,158 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto max-w-7xl px-6 py-16">
-        <div className="mb-10 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-indigo-300">
-            <Sparkles className="h-6 w-6" />
-            <span className="text-sm font-semibold uppercase tracking-[0.28em]">TalentFlow AI</span>
+    <main className="jarvis-home min-h-screen text-slate-100">
+      <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8 lg:px-10">
+        <header className="jarvis-header flex items-center justify-between gap-4">
+          <a href="/" className="flex items-center gap-3 text-sky-200 no-underline" aria-label="TalentFlow home">
+            <span className="jarvis-brand-mark"><Sparkles className="h-5 w-5" /></span>
+            <span className="text-sm font-semibold uppercase tracking-[0.24em]">TalentFlow <span className="text-sky-400">AI</span></span>
+          </a>
+          <div className="flex items-center gap-3">
+            <span className="hidden items-center gap-2 text-xs uppercase tracking-[0.16em] text-sky-200/60 sm:inline-flex">
+              <span className="jarvis-live-dot" /> Hiring system online
+            </span>
+            <RefreshButton onClick={refreshCurrentPage} />
           </div>
-          <RefreshButton onClick={refreshCurrentPage} />
-        </div>
+        </header>
 
-        <section className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div>
-            <p className="mb-4 inline-flex rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-200">
-              Enterprise recruitment platform
+        <section className="jarvis-hero grid items-center gap-10 py-14 xl:grid-cols-[0.9fr_1.1fr] xl:gap-8 xl:py-20">
+          <div className="relative z-10">
+            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-300/[0.06] px-4 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-sky-200">
+              <span className="jarvis-live-dot" /> Recruitment command center
             </p>
-            <h1 className="max-w-xl text-4xl font-bold tracking-tight text-white md:text-6xl">
-              Recruitment intelligence for modern HR teams.
+            <h1 className="max-w-2xl text-5xl font-semibold leading-[1.04] tracking-tight text-white sm:text-6xl xl:text-7xl">
+              From first hello<br />to <span className="jarvis-title-glow">hired.</span>
             </h1>
-            <p className="mt-6 max-w-xl text-lg text-slate-300">
-              Candidate lifecycle management, secure hiring workflows, and controlled AI-driven insights in one scalable platform.
+            <p className="mt-6 max-w-xl text-base leading-7 text-slate-300/80 sm:text-lg">
+              One clear view of the candidate journey. Explore how TalentFlow moves from profile and resume to human review, interviews and outcome.
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <button onClick={openHrDashboard} className="rounded-xl bg-indigo-500 px-5 py-3 font-medium text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400">
-                HR dashboard
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button onClick={openHrDashboard} className="jarvis-primary-button">
+                Open HR dashboard <ArrowRight className="h-4 w-4" />
               </button>
-              <button onClick={openRegistration} className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-800">
-                Register as candidate
+              <button onClick={openRegistration} className="jarvis-secondary-button">
+                Start candidate profile
               </button>
-              <button onClick={openCandidatePortal} className="rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-5 py-3 font-medium text-indigo-200 transition hover:bg-indigo-500/20">
-                View my profile
-              </button>
+            </div>
+            <button
+              type="button"
+              onClick={openCandidatePortal}
+              className="mt-5 inline-flex items-center gap-2 text-sm text-sky-200/70 transition hover:text-sky-100"
+            >
+              Already registered? View your profile <ArrowRight className="h-4 w-4" />
+            </button>
+            <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 border-t border-sky-200/10 pt-5 text-xs uppercase tracking-[0.12em] text-slate-400">
+              <span><span className="text-sky-200">01</span> Candidate-first</span>
+              <span><span className="text-sky-200">02</span> Human-reviewed</span>
+              <span><span className="text-sky-200">03</span> Status-visible</span>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-            <div className="grid gap-4">
-              <div className="rounded-2xl bg-slate-800 p-4">
-                <p className="text-sm text-slate-400">Candidates registered</p>
-                <div className="mt-3 flex items-end justify-between">
-                  <span className="text-3xl font-bold text-white">12,480</span>
-                  <span className="text-sm font-medium text-emerald-400">+18.4%</span>
-                </div>
+          <div className="jarvis-scene" aria-label="Interactive 3D-style candidate hiring workflow">
+            <div className="jarvis-scene-grid" aria-hidden="true" />
+            <div className="jarvis-orbit jarvis-orbit-outer" aria-hidden="true" />
+            <div className="jarvis-orbit jarvis-orbit-inner" aria-hidden="true" />
+            <div className="jarvis-core" aria-hidden="true">
+              <div className="jarvis-core-inner">
+                <Sparkles className="h-8 w-8 text-sky-100" />
+                <span>Talent<br />Flow</span>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl bg-slate-800 p-4">
-                  <p className="text-sm text-slate-400">Pending HR review</p>
-                  <p className="mt-2 text-2xl font-semibold text-white">248</p>
-                </div>
-                <div className="rounded-2xl bg-slate-800 p-4">
-                  <p className="text-sm text-slate-400">AI match score</p>
-                  <p className="mt-2 text-2xl font-semibold text-white">89.4</p>
-                </div>
-              </div>
+            </div>
+            {workflowSteps.map(({ title, icon: Icon }, index) => (
+              <button
+                type="button"
+                key={title}
+                onClick={() => setActiveWorkflowStep(index)}
+                aria-label={`Show workflow step ${index + 1}: ${title}`}
+                aria-pressed={activeWorkflowStep === index}
+                className={`jarvis-node jarvis-node-${index + 1} ${activeWorkflowStep === index ? 'is-active' : ''}`}
+              >
+                <span className="jarvis-node-icon"><Icon className="h-4 w-4" /></span>
+                <span className="jarvis-node-copy">
+                  <span className="jarvis-node-number">NODE 0{index + 1}</span>
+                  <span className="jarvis-node-title">{title}</span>
+                </span>
+                <span className="jarvis-node-pulse" aria-hidden="true" />
+              </button>
+            ))}
+            <div className="jarvis-scene-caption">
+              <span className="jarvis-live-dot" /> LIVE WORKFLOW MAP <span className="text-sky-200/35">/</span> SELECT A NODE
             </div>
           </div>
         </section>
 
-        <section className="mt-16 grid gap-6 md:grid-cols-3">
-          {highlights.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <div className="mb-4 inline-flex rounded-xl bg-indigo-500/10 p-3 text-indigo-300">
-                <Icon className="h-5 w-5" />
-              </div>
-              <h2 className="text-xl font-semibold text-white">{title}</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-300">{text}</p>
+        <section id="workflow" className="jarvis-workflow-section scroll-mt-8">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-sky-300/70">The candidate journey</p>
+              <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">A connected hiring flow</h2>
             </div>
+            <p className="max-w-md text-sm leading-6 text-slate-400">
+              Resume signals are rules-based and advisory. Final decisions stay with the HR team.
+            </p>
+          </div>
+          <div className="jarvis-flow-track" aria-label="Candidate hiring workflow steps">
+            {workflowSteps.map(({ number, title, subtitle, description, icon: Icon }, index) => (
+              <button
+                type="button"
+                key={number}
+                onClick={() => setActiveWorkflowStep(index)}
+                aria-pressed={activeWorkflowStep === index}
+                className={`jarvis-flow-step ${activeWorkflowStep === index ? 'is-active' : ''}`}
+              >
+                <span className="jarvis-flow-step-top">
+                  <span className="jarvis-flow-icon"><Icon className="h-5 w-5" /></span>
+                  <span className="jarvis-flow-number">{number}</span>
+                </span>
+                <span className="jarvis-flow-title">{title}</span>
+                <span className="jarvis-flow-subtitle">{subtitle}</span>
+                <span className="jarvis-flow-description">{description}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="jarvis-detail-panel mt-5 flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6" aria-live="polite">
+          <div className="flex items-start gap-4">
+            <span className="jarvis-detail-icon">
+              {(() => {
+                const Icon = workflowSteps[activeWorkflowStep].icon
+                return <Icon className="h-5 w-5" />
+              })()}
+            </span>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-sky-300/70">Step 0{activeWorkflowStep + 1} / workflow detail</p>
+              <h3 className="mt-1 text-lg font-semibold text-white">{workflowSteps[activeWorkflowStep].title} <span className="font-normal text-slate-400">· {workflowSteps[activeWorkflowStep].subtitle}</span></h3>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">{workflowSteps[activeWorkflowStep].description}</p>
+            </div>
+          </div>
+          {activeWorkflowStep === 0 && (
+            <button onClick={openRegistration} className="jarvis-text-link shrink-0">
+              Register <ArrowRight className="h-4 w-4" />
+            </button>
+          )}
+          {activeWorkflowStep === 2 && (
+            <button onClick={openHrDashboard} className="jarvis-text-link shrink-0">
+              HR dashboard <ArrowRight className="h-4 w-4" />
+            </button>
+          )}
+        </section>
+
+        <section className="mt-16 grid gap-5 border-t border-sky-200/10 py-10 md:grid-cols-3">
+          {highlights.map(({ icon: Icon, title, text }) => (
+            <article key={title} className="jarvis-highlight">
+              <span className="jarvis-highlight-icon"><Icon className="h-5 w-5" /></span>
+              <div>
+                <h3 className="font-semibold text-slate-100">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{text}</p>
+              </div>
+            </article>
           ))}
         </section>
+        <footer className="border-t border-sky-200/10 py-5 text-center text-xs tracking-wide text-slate-500">
+          TALENTFLOW AI <span className="px-2 text-sky-300/50">•</span> CANDIDATE JOURNEY OVERVIEW
+        </footer>
       </div>
     </main>
   )

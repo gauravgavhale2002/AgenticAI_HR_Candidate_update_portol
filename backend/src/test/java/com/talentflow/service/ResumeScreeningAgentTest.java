@@ -39,6 +39,36 @@ class ResumeScreeningAgentTest {
     }
 
     @Test
+    void rejectsJoiningBookletEvenWhenFileNameLooksLikePdf() throws IOException {
+        MockMultipartFile booklet = pdf("CWR Joining Booklet_Personal Details.docx.pdf",
+                "PROFESSIONAL SUMMARY Software engineer with 5 years of professional experience. "
+                        + "TECHNICAL SKILLS Java Spring Boot React SQL. "
+                        + "WORK EXPERIENCE Built APIs and applications. EDUCATION Bachelor of Science. "
+                        + "PROJECTS and certifications listed below. ".repeat(3));
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> agent.analyze(booklet));
+
+        assertEquals(422, error.getStatusCode().value());
+        assertTrue(error.getReason().contains("booklet or joining form"));
+    }
+
+    @Test
+    void rejectsJoiningBookletBasedOnPdfContentWhenFileNameIsGeneric() throws IOException {
+        MockMultipartFile booklet = pdf("document.pdf",
+                "CWR Joining Booklet Personal Details and joining formalities. "
+                        + "Complete employee information and nomination form details here. ".repeat(3));
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> agent.analyze(booklet));
+
+        assertEquals(422, error.getStatusCode().value());
+        assertTrue(error.getReason().contains("booklet or joining form"));
+    }
+
+    @Test
     void acceptsCvAndExtractsSkillsAndExperience() throws IOException {
         MockMultipartFile resume = pdf("resume.pdf",
                 "PROFESSIONAL SUMMARY Software engineer with 5 years of professional experience. "
