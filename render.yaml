@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: talentflowai-demo
+    name: talentflowai-candidate-update
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
